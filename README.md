@@ -30,6 +30,7 @@ All commands work with `/frag`, `/fragcount`, or `/fc`.
 | Command | Description |
 |---|---|
 | `/frag` | Show full summary |
+| `/frag help` | Show all commands in-game |
 | `/frag show` | Show display frame |
 | `/frag hide` | Hide display frame |
 | `/frag lock` | Lock frame position |
