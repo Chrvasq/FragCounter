@@ -12,10 +12,14 @@ local FRAGMENTS_TOTAL_GOAL = 36000
 
 local sessionLooted = 0
 local sessionDeaths = 0
+local sessionGold = 0 -- copper gained this session (from loot + vendor)
+local sessionVendorGold = 0 -- copper gained from vendoring
 local sessionStartTime = nil -- GetTime() of first loot this session
 local addonLoaded = false
 local bagUpdateDirty = false
 local cachedBroodIndex = nil
+local loginMoney = nil -- GetMoney() at login
+local merchantOpenMoney = nil -- GetMoney() when merchant opened
 
 -- Rolling window for rate calculation (last 15 minutes)
 local RATE_WINDOW = 900
@@ -45,6 +49,26 @@ local function FormatDuration(seconds)
         return h .. "h " .. m .. "m"
     end
     return m .. "m"
+end
+
+-- Format copper amount as gold/silver/copper string
+local function FormatMoney(copper)
+    if copper == 0 then return "0c" end
+    local negative = copper < 0
+    if negative then copper = 0 - copper end
+    local g = math.floor(copper / 10000)
+    local s = math.floor(mod(copper, 10000) / 100)
+    local c = mod(copper, 100)
+    local result = ""
+    if negative then result = "-" end
+    if g > 0 then
+        result = result .. "|cffffd700" .. FormatNumber(g) .. "g|r "
+    end
+    if s > 0 or g > 0 then
+        result = result .. "|cffc7c7cf" .. s .. "s|r "
+    end
+    result = result .. "|cffeda55f" .. c .. "c|r"
+    return result
 end
 
 local function CountFragmentsInContainer(bagID)
@@ -178,7 +202,7 @@ end
 -- Ensure daily entry has all fields
 local function GetDailyEntry(dateKey)
     if not FragCounterDB.daily[dateKey] then
-        FragCounterDB.daily[dateKey] = { looted = 0, deaths = 0, firstLoot = nil, lastLoot = nil }
+        FragCounterDB.daily[dateKey] = { looted = 0, deaths = 0, gold = 0, vendorGold = 0, firstLoot = nil, lastLoot = nil }
     end
     -- Migrate old format (plain number) to new table format
     if type(FragCounterDB.daily[dateKey]) == "number" then
@@ -234,6 +258,8 @@ local function SaveSession()
     FragCounterDB.session = {
         looted = sessionLooted,
         deaths = sessionDeaths,
+        gold = sessionGold,
+        vendorGold = sessionVendorGold,
         startTime = sessionStartTime,
         timestamps = lootTimestamps,
         savedTime = GetTime(),
@@ -340,6 +366,13 @@ local function PrintSummary()
         sessionLine = sessionLine .. " (" .. FormatDuration(elapsed) .. ")"
     end
     DEFAULT_CHAT_FRAME:AddMessage("|cffffffff" .. sessionLine .. "|r")
+    if sessionGold > 0 then
+        local goldLine = "  Gold: " .. FormatMoney(sessionGold)
+        if sessionVendorGold > 0 then
+            goldLine = goldLine .. " (vendor: " .. FormatMoney(sessionVendorGold) .. ")"
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cffffffff" .. goldLine .. "|r")
+    end
 
     -- Today stats
     local todayLine = "Today (" .. today .. "): +" .. FormatNumber(dayData.looted) .. " fragments"
@@ -350,6 +383,13 @@ local function PrintSummary()
         todayLine = todayLine .. ", " .. dayData.deaths .. " deaths"
     end
     DEFAULT_CHAT_FRAME:AddMessage("|cff88ff88" .. todayLine .. "|r")
+    if (dayData.gold or 0) > 0 then
+        local todayGoldLine = "  Gold: " .. FormatMoney(dayData.gold)
+        if (dayData.vendorGold or 0) > 0 then
+            todayGoldLine = todayGoldLine .. " (vendor: " .. FormatMoney(dayData.vendorGold) .. ")"
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff88ff88" .. todayGoldLine .. "|r")
+    end
 
     -- Rate comparison
     local rolling = GetRollingRate()
@@ -420,6 +460,9 @@ local function PrintSummary()
             if entry.deaths > 0 then
                 line = line .. ", " .. entry.deaths .. " deaths"
             end
+            if (entry.gold or 0) > 0 then
+                line = line .. ", " .. FormatMoney(entry.gold)
+            end
             if entry.firstLoot and entry.lastLoot and entry.lastLoot > entry.firstLoot then
                 local duration = entry.lastLoot - entry.firstLoot
                 local avg = math.floor(entry.looted / duration * 3600)
@@ -444,6 +487,8 @@ local function SlashHandler(msg)
     elseif msg == "reset session" then
         sessionLooted = 0
         sessionDeaths = 0
+        sessionGold = 0
+        sessionVendorGold = 0
         sessionStartTime = nil
         lootTimestamps = {}
         FragCounterDB.session = nil
@@ -459,6 +504,8 @@ local function SlashHandler(msg)
         FragCounterDB.session = nil
         sessionLooted = 0
         sessionDeaths = 0
+        sessionGold = 0
+        sessionVendorGold = 0
         sessionStartTime = nil
         lootTimestamps = {}
         UpdateDisplay()
@@ -536,6 +583,9 @@ function FragCounter_OnLoad()
     this:RegisterEvent("PLAYER_ENTERING_WORLD")
     this:RegisterEvent("PLAYER_DEAD")
     this:RegisterEvent("CHAT_MSG_LOOT")
+    this:RegisterEvent("CHAT_MSG_MONEY")
+    this:RegisterEvent("MERCHANT_SHOW")
+    this:RegisterEvent("MERCHANT_CLOSED")
     this:RegisterEvent("BAG_UPDATE")
     this:RegisterEvent("BANKFRAME_OPENED")
     this:RegisterEvent("BANKFRAME_CLOSED")
@@ -553,6 +603,8 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         if FragCounterDB.session and FragCounterDB.session.savedTime and GetTime() >= FragCounterDB.session.savedTime then
             sessionLooted = FragCounterDB.session.looted or 0
             sessionDeaths = FragCounterDB.session.deaths or 0
+            sessionGold = FragCounterDB.session.gold or 0
+            sessionVendorGold = FragCounterDB.session.vendorGold or 0
             sessionStartTime = FragCounterDB.session.startTime
             lootTimestamps = FragCounterDB.session.timestamps or {}
         end
@@ -570,6 +622,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter|r loaded. Type |cffffffff/frag|r for summary, |cffffffff/frag help|r for commands.")
 
     elseif event == "PLAYER_ENTERING_WORLD" then
+        loginMoney = GetMoney()
         local bagCount = CountBagFragments()
         SaveCharacterCount(bagCount, nil)
         UpdateDisplay()
@@ -581,6 +634,46 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         local count = ParseLootMessage(arg1)
         if count > 0 then
             OnFragmentsLooted(count)
+        end
+
+    elseif event == "CHAT_MSG_MONEY" then
+        -- Fires when you loot money: "You loot 1 Gold, 5 Silver, 23 Copper"
+        if arg1 and strfind(arg1, "You loot") then
+            local copper = 0
+            local _, _, g = strfind(arg1, "(%d+) Gold")
+            local _, _, s = strfind(arg1, "(%d+) Silver")
+            local _, _, c = strfind(arg1, "(%d+) Copper")
+            if g then copper = copper + tonumber(g) * 10000 end
+            if s then copper = copper + tonumber(s) * 100 end
+            if c then copper = copper + tonumber(c) end
+            if copper > 0 then
+                sessionGold = sessionGold + copper
+                local today = GetDateKey()
+                local dayData = GetDailyEntry(today)
+                dayData.gold = (dayData.gold or 0) + copper
+                SaveSession()
+            end
+        end
+
+    elseif event == "MERCHANT_SHOW" then
+        merchantOpenMoney = GetMoney()
+
+    elseif event == "MERCHANT_CLOSED" then
+        if merchantOpenMoney then
+            local income = GetMoney() - merchantOpenMoney
+            merchantOpenMoney = nil
+            if income > 0 then
+                sessionGold = sessionGold + income
+                sessionVendorGold = sessionVendorGold + income
+                local today = GetDateKey()
+                local dayData = GetDailyEntry(today)
+                dayData.gold = (dayData.gold or 0) + income
+                dayData.vendorGold = (dayData.vendorGold or 0) + income
+                SaveSession()
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Vendor income: " .. FormatMoney(income))
+            end
+            -- Re-sync loginMoney baseline after vendor
+            loginMoney = GetMoney() - sessionGold
         end
 
     elseif event == "BAG_UPDATE" then
