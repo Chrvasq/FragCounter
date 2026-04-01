@@ -1,0 +1,7 @@
+## Interface: 11200
+## Title: FragCounter
+## Notes: Tracks Silithid Carapace Fragment looting for the Scarab Lord questline
+## Author: FragCounter
+## SavedVariables: FragCounterDB
+FragCounter.lua
+FragCounter.xml
