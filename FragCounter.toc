@@ -3,5 +3,6 @@
 ## Notes: Tracks Silithid Carapace Fragment looting for the Scarab Lord questline
 ## Author: FragCounter
 ## SavedVariables: FragCounterDB
+## SavedVariablesPerCharacter: FragCounterCharDB
 FragCounter.lua
 FragCounter.xml

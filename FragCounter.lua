@@ -552,6 +552,24 @@ local function SlashHandler(msg)
         local repPer = GetRepPerTurnin()
         local setting = FragCounterDB.turnInRace or "auto"
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Turn-in race: " .. setting .. " (" .. repPer .. " rep per turn-in)")
+    elseif strfind(msg, "^scale%s+[%d%.]+$") then
+        local _, _, num = strfind(msg, "^scale%s+([%d%.]+)$")
+        local scale = tonumber(num)
+        if scale and scale >= 0.5 and scale <= 2.0 then
+            if not FragCounterCharDB then FragCounterCharDB = {} end
+            FragCounterCharDB.scale = scale
+            FragCounterFrame:SetScale(scale)
+            -- Re-anchor to center so it doesn't go off screen
+            FragCounterFrame:ClearAllPoints()
+            FragCounterFrame:SetPoint("CENTER", "UIParent", "CENTER", 0, 0)
+            FragCounter_SaveFramePosition()
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Scale set to " .. num .. ". Frame re-centered — drag to reposition.")
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Scale must be between 0.5 and 2.0.")
+        end
+    elseif msg == "scale" then
+        local scale = (FragCounterCharDB and FragCounterCharDB.scale) or 1.0
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Current scale: " .. scale .. " (use /frag scale <0.5-2.0>)")
     elseif msg == "lock" then
         FragCounterDB.locked = true
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Display locked.")
@@ -563,6 +581,7 @@ local function SlashHandler(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag|r - Show summary")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag show|r - Show display frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag hide|r - Hide display frame")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag scale <0.5-2.0>|r - Set display scale")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag lock|r - Lock frame position")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag unlock|r - Unlock frame (draggable)")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag goal|r - Show progress toward goal")
@@ -577,6 +596,28 @@ local function SlashHandler(msg)
         PrintSummary()
     end
 end
+
+-- Per-character frame position and size
+function FragCounter_SaveFramePosition()
+    if not FragCounterCharDB then FragCounterCharDB = {} end
+    local point, _, relPoint, x, y = FragCounterFrame:GetPoint()
+    FragCounterCharDB.point = point
+    FragCounterCharDB.relPoint = relPoint
+    FragCounterCharDB.x = x
+    FragCounterCharDB.y = y
+end
+
+function FragCounter_RestoreFrame()
+    if not FragCounterCharDB then FragCounterCharDB = {} end
+    if FragCounterCharDB.scale then
+        FragCounterFrame:SetScale(FragCounterCharDB.scale)
+    end
+    if FragCounterCharDB.point then
+        FragCounterFrame:ClearAllPoints()
+        FragCounterFrame:SetPoint(FragCounterCharDB.point, "UIParent", FragCounterCharDB.relPoint, FragCounterCharDB.x, FragCounterCharDB.y)
+    end
+end
+
 
 function FragCounter_OnLoad()
     this:RegisterEvent("VARIABLES_LOADED")
@@ -617,6 +658,8 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
 
         FragCounterFrame:SetBackdropColor(0, 0, 0, 0.8)
         FragCounterFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+        FragCounterFrame:SetClampedToScreen(true)
+        FragCounter_RestoreFrame()
 
         UpdateDisplay()
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter|r loaded. Type |cffffffff/frag|r for summary, |cffffffff/frag help|r for commands.")

@@ -12,7 +12,7 @@
   <!-- Main display frame -->
   <Frame name="FragCounterFrame" toplevel="true" movable="true" enableMouse="true" parent="UIParent" hidden="true">
     <Size>
-      <AbsDimension x="180" y="64"/>
+      <AbsDimension x="250" y="64"/>
     </Size>
     <Anchors>
       <Anchor point="CENTER"/>
@@ -47,6 +47,11 @@
                 <AbsDimension x="10" y="-24"/>
               </Offset>
             </Anchor>
+            <Anchor point="RIGHT" relativeTo="FragCounterFrame" relativePoint="CENTER">
+              <Offset>
+                <AbsDimension x="10" y="0"/>
+              </Offset>
+            </Anchor>
           </Anchors>
           <Color r="1" g="1" b="1"/>
         </FontString>
@@ -57,11 +62,21 @@
                 <AbsDimension x="10" y="-38"/>
               </Offset>
             </Anchor>
+            <Anchor point="RIGHT" relativeTo="FragCounterFrame" relativePoint="CENTER">
+              <Offset>
+                <AbsDimension x="10" y="0"/>
+              </Offset>
+            </Anchor>
           </Anchors>
           <Color r="1" g="1" b="1"/>
         </FontString>
         <FontString name="FragCounterRateText" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
           <Anchors>
+            <Anchor point="LEFT" relativeTo="FragCounterFrame" relativePoint="CENTER">
+              <Offset>
+                <AbsDimension x="-10" y="0"/>
+              </Offset>
+            </Anchor>
             <Anchor point="TOPRIGHT" relativeTo="FragCounterFrame" relativePoint="TOPRIGHT">
               <Offset>
                 <AbsDimension x="-10" y="-24"/>
@@ -72,6 +87,11 @@
         </FontString>
         <FontString name="FragCounterTotalText" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
           <Anchors>
+            <Anchor point="LEFT" relativeTo="FragCounterFrame" relativePoint="CENTER">
+              <Offset>
+                <AbsDimension x="-10" y="0"/>
+              </Offset>
+            </Anchor>
             <Anchor point="TOPRIGHT" relativeTo="FragCounterFrame" relativePoint="TOPRIGHT">
               <Offset>
                 <AbsDimension x="-10" y="-38"/>
@@ -90,6 +110,7 @@
       </OnMouseDown>
       <OnMouseUp>
         this:StopMovingOrSizing()
+        FragCounter_SaveFramePosition()
       </OnMouseUp>
     </Scripts>
   </Frame>
