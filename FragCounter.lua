@@ -677,9 +677,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         end
 
     elseif event == "BAG_UPDATE" then
-        if addonLoaded then
-            bagUpdateDirty = true
-        end
+        bagUpdateDirty = true
 
     elseif event == "BANKFRAME_OPENED" then
         local bankCount = CountBankFragments()
@@ -695,7 +693,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
 end
 
 function FragCounter_OnUpdate()
-    if bagUpdateDirty then
+    if bagUpdateDirty and addonLoaded then
         bagUpdateDirty = false
         local bagCount = CountBagFragments()
         SaveCharacterCount(bagCount, nil)
