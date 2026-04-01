@@ -276,14 +276,52 @@ local function UpdateDisplay()
     FragCounterSessionText:SetText("Session: +" .. FormatNumber(sessionLooted))
     FragCounterTodayText:SetText("Today: +" .. FormatNumber(dayData.looted))
 
+    FragCounterTotalText:SetText("Total: " .. FormatNumber(charTotal))
+
     local perHour = GetRollingRate()
     if perHour > 0 then
-        FragCounterRateText:SetText("~" .. FormatNumber(perHour) .. "/hr")
+        FragCounterRateText:SetText("Rate: ~" .. FormatNumber(perHour) .. "/hr")
     else
         FragCounterRateText:SetText("")
     end
 
-    FragCounterTotalText:SetText("Total: " .. FormatNumber(charTotal))
+    if sessionGold > 0 then
+        FragCounterGoldText:SetText("Gold: " .. FormatMoney(sessionGold))
+    else
+        FragCounterGoldText:SetText("")
+    end
+
+    if sessionDeaths > 0 then
+        FragCounterDeathText:SetText("Deaths: " .. sessionDeaths)
+    else
+        FragCounterDeathText:SetText("")
+    end
+
+    -- Dynamic height based on visible rows
+    -- Rows at fixed Y offsets: Session(-22), Today(-34), Total(-46), Rate(-58), Gold(-70), Deaths(-82)
+    local height = 66 -- base: title + session + today + total + padding
+    if perHour > 0 then height = 66 + 12 end
+    local extraRows = 0
+    if sessionGold > 0 then extraRows = extraRows + 1 end
+    if sessionDeaths > 0 then extraRows = extraRows + 1 end
+    -- Shift gold/deaths up if rate is hidden
+    if perHour <= 0 then
+        local goldY = -58
+        local deathY = sessionGold > 0 and -70 or -58
+        FragCounterGoldText:ClearAllPoints()
+        FragCounterGoldText:SetPoint("TOPLEFT", FragCounterFrame, "TOPLEFT", 10, goldY)
+        FragCounterDeathText:ClearAllPoints()
+        FragCounterDeathText:SetPoint("TOPLEFT", FragCounterFrame, "TOPLEFT", 10, deathY)
+        height = 66 + extraRows * 12
+    else
+        FragCounterGoldText:ClearAllPoints()
+        FragCounterGoldText:SetPoint("TOPLEFT", FragCounterFrame, "TOPLEFT", 10, -70)
+        FragCounterDeathText:ClearAllPoints()
+        local deathY = sessionGold > 0 and -82 or -70
+        FragCounterDeathText:SetPoint("TOPLEFT", FragCounterFrame, "TOPLEFT", 10, deathY)
+        height = 66 + 12 + extraRows * 12
+    end
+    FragCounterFrame:SetHeight(height)
 
     if FragCounterDB.shown then
         FragCounterFrame:Show()
@@ -729,8 +767,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         UpdateDisplay()
 
     elseif event == "BANKFRAME_CLOSED" then
-        local bankCount = CountBankFragments()
-        SaveCharacterCount(nil, bankCount)
+        -- Don't re-scan; bank API returns 0 when closed
         UpdateDisplay()
     end
 end
