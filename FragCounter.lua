@@ -202,14 +202,15 @@ end
 -- Ensure daily entry has all fields
 local function GetDailyEntry(dateKey)
     if not FragCounterDB.daily[dateKey] then
-        FragCounterDB.daily[dateKey] = { looted = 0, deaths = 0, gold = 0, vendorGold = 0, firstLoot = nil, lastLoot = nil }
+        FragCounterDB.daily[dateKey] = { looted = 0, deaths = 0, gold = 0, vendorGold = 0, activeTime = 0, lastLootTime = nil }
     end
     -- Migrate old format (plain number) to new table format
     if type(FragCounterDB.daily[dateKey]) == "number" then
         FragCounterDB.daily[dateKey] = {
             looted = FragCounterDB.daily[dateKey],
             deaths = 0,
-            firstLoot = nil,
+            activeTime = 0,
+            lastLootTime = nil,
             lastLoot = nil,
         }
     end
@@ -346,10 +347,14 @@ local function OnFragmentsLooted(count)
     local dayData = GetDailyEntry(today)
     dayData.looted = dayData.looted + count
     local now = GetTime()
-    if not dayData.firstLoot then
-        dayData.firstLoot = now
+    -- Accumulate active farming time: count gaps under 5 min as active
+    if dayData.lastLootTime then
+        local gap = now - dayData.lastLootTime
+        if gap < 300 then
+            dayData.activeTime = (dayData.activeTime or 0) + gap
+        end
     end
-    dayData.lastLoot = now
+    dayData.lastLootTime = now
 
     SaveSession()
 
@@ -503,10 +508,14 @@ local function PrintSummary()
             if (entry.gold or 0) > 0 then
                 line = line .. ", " .. FormatMoney(entry.gold)
             end
-            if entry.firstLoot and entry.lastLoot and entry.lastLoot > entry.firstLoot then
-                local duration = entry.lastLoot - entry.firstLoot
-                local avg = math.floor(entry.looted / duration * 3600)
-                line = line .. " | " .. FormatDuration(duration) .. " avg " .. FormatNumber(avg) .. "/hr"
+            local farmTime = entry.activeTime or 0
+            -- Fallback for old data that only has firstLoot/lastLoot
+            if farmTime < 60 and entry.firstLoot and entry.lastLoot and entry.lastLoot > entry.firstLoot then
+                farmTime = entry.lastLoot - entry.firstLoot
+            end
+            if farmTime > 60 then
+                local avg = math.floor(entry.looted / farmTime * 3600)
+                line = line .. " | " .. FormatDuration(farmTime) .. " avg " .. FormatNumber(avg) .. "/hr"
             end
             DEFAULT_CHAT_FRAME:AddMessage("|cffffffff" .. line .. "|r")
         end
@@ -744,6 +753,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
                 local dayData = GetDailyEntry(today)
                 dayData.gold = (dayData.gold or 0) + copper
                 SaveSession()
+                UpdateDisplay()
             end
         end
 
@@ -762,6 +772,7 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
                 dayData.gold = (dayData.gold or 0) + income
                 dayData.vendorGold = (dayData.vendorGold or 0) + income
                 SaveSession()
+                UpdateDisplay()
                 DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Vendor income: " .. FormatMoney(income))
             end
             -- Re-sync loginMoney baseline after vendor
