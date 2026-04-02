@@ -40,6 +40,8 @@ All commands work with `/frag`, `/fragcount`, or `/fc`.
 | `/frag turnin` | Toggle turn-in counts per day |
 | `/frag race` | Show turn-in character race setting |
 | `/frag race human\|other\|auto` | Set turn-in character race |
+| `/frag scale <0.5-2.0>` | Set display scale (per character) |
+| `/frag chat` | Toggle per-loot chat messages |
 | `/frag reset session` | Reset session counter |
 | `/frag reset today` | Reset today's counter |
 | `/frag reset all` | Reset ALL saved data |

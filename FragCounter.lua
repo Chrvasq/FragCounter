@@ -364,12 +364,14 @@ local function OnFragmentsLooted(count)
         end
     end
 
-    DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ccffFragCounter:|r +" .. count ..
-        "  |cffffffffSession: " .. FormatNumber(sessionLooted) ..
-        "  |cff88ff88Today: " .. FormatNumber(dayData.looted) ..
-        "|r" .. turnInMsg
-    )
+    if FragCounterDB.showChat ~= false then
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cff00ccffFragCounter:|r +" .. count ..
+            "  |cffffffffSession: " .. FormatNumber(sessionLooted) ..
+            "  |cff88ff88Today: " .. FormatNumber(dayData.looted) ..
+            "|r" .. turnInMsg
+        )
+    end
 
     UpdateDisplay()
 end
@@ -608,6 +610,14 @@ local function SlashHandler(msg)
     elseif msg == "scale" then
         local scale = (FragCounterCharDB and FragCounterCharDB.scale) or 1.0
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Current scale: " .. scale .. " (use /frag scale <0.5-2.0>)")
+    elseif msg == "chat" then
+        if FragCounterDB.showChat == false then
+            FragCounterDB.showChat = true
+        else
+            FragCounterDB.showChat = false
+        end
+        local state = FragCounterDB.showChat ~= false and "ON" or "OFF"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Loot chat messages " .. state .. ".")
     elseif msg == "lock" then
         FragCounterDB.locked = true
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Display locked.")
@@ -620,6 +630,7 @@ local function SlashHandler(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag show|r - Show display frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag hide|r - Hide display frame")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag scale <0.5-2.0>|r - Set display scale")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag chat|r - Toggle loot chat messages")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag lock|r - Lock frame position")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag unlock|r - Unlock frame (draggable)")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag goal|r - Show progress toward goal")
