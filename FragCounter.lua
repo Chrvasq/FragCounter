@@ -181,6 +181,19 @@ local function CalcFragsToNeutral(repToNeutral)
     return turnins, turnins * FRAGMENTS_PER_TURNIN
 end
 
+-- Get total fragments needed to reach Neutral based on current rep, or custom goal
+local function GetFragmentGoal()
+    if FragCounterDB and FragCounterDB.goal then
+        return FragCounterDB.goal
+    end
+    local _, repToNeutral = GetBroodRep()
+    if repToNeutral > 0 then
+        local _, fragsNeeded = CalcFragsToNeutral(repToNeutral)
+        return fragsNeeded
+    end
+    return FRAGMENTS_TOTAL_GOAL
+end
+
 local function InitDB()
     if not FragCounterDB then
         FragCounterDB = {}
@@ -561,16 +574,21 @@ local function SlashHandler(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r All data reset.")
     elseif msg == "goal" then
         local charTotal = GetAllCharacterTotal()
+        local goal = GetFragmentGoal()
         local pct = 0
-        if FRAGMENTS_TOTAL_GOAL > 0 then
-            pct = math.floor(charTotal / FRAGMENTS_TOTAL_GOAL * 100)
+        if goal > 0 then
+            pct = math.floor(charTotal / goal * 100)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Goal is " .. FormatNumber(FRAGMENTS_TOTAL_GOAL) .. " fragments. Have: " .. FormatNumber(charTotal) .. " (" .. pct .. "%)")
+        local source = FragCounterDB.goal and "custom" or "from rep"
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Goal: " .. FormatNumber(goal) .. " fragments (" .. source .. "). Have: " .. FormatNumber(charTotal) .. " (" .. pct .. "%)")
     elseif strfind(msg, "^goal%s+%d+$") then
         local _, _, num = strfind(msg, "^goal%s+(%d+)$")
-        FRAGMENTS_TOTAL_GOAL = tonumber(num)
-        FragCounterDB.goal = FRAGMENTS_TOTAL_GOAL
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Goal set to " .. FormatNumber(FRAGMENTS_TOTAL_GOAL) .. " fragments.")
+        FragCounterDB.goal = tonumber(num)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Custom goal set to " .. FormatNumber(FragCounterDB.goal) .. " fragments.")
+    elseif msg == "goal auto" then
+        FragCounterDB.goal = nil
+        local goal = GetFragmentGoal()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Goal auto-calculating from rep (" .. FormatNumber(goal) .. " fragments).")
     elseif msg == "turnin" then
         FragCounterDB.showTurnIn = not FragCounterDB.showTurnIn
         local state = FragCounterDB.showTurnIn and "ON" or "OFF"
@@ -644,6 +662,7 @@ local function SlashHandler(msg)
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag unlock|r - Unlock frame (draggable)")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag goal|r - Show progress toward goal")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag goal <number>|r - Set custom goal")
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag goal auto|r - Auto-calculate goal from rep")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag turnin|r - Toggle turn-in countdown")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag race|r - Show turn-in character race")
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffffff/frag race human|other|auto|r - Set turn-in race")
@@ -693,9 +712,6 @@ end
 function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
     if event == "VARIABLES_LOADED" then
         InitDB()
-        if FragCounterDB.goal then
-            FRAGMENTS_TOTAL_GOAL = FragCounterDB.goal
-        end
         addonLoaded = true
 
         -- Restore session if this is a /reload (GetTime continues counting)

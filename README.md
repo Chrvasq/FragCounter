@@ -35,8 +35,9 @@ All commands work with `/frag`, `/fragcount`, or `/fc`.
 | `/frag hide` | Hide display frame |
 | `/frag lock` | Lock frame position |
 | `/frag unlock` | Unlock frame (draggable) |
-| `/frag goal` | Show progress toward goal |
+| `/frag goal` | Show progress toward goal (auto-calculates from rep) |
 | `/frag goal <number>` | Set custom fragment goal |
+| `/frag goal auto` | Reset goal to auto-calculate from rep |
 | `/frag turnin` | Toggle turn-in counts per day |
 | `/frag race` | Show turn-in character race setting |
 | `/frag race human\|other\|auto` | Set turn-in character race |
