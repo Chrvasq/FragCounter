@@ -707,6 +707,7 @@ function FragCounter_OnLoad()
     this:RegisterEvent("BAG_UPDATE")
     this:RegisterEvent("BANKFRAME_OPENED")
     this:RegisterEvent("BANKFRAME_CLOSED")
+    this:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
 end
 
 function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
@@ -799,22 +800,37 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         bagUpdateDirty = true
 
     elseif event == "BANKFRAME_OPENED" then
+        bankIsOpen = true
         local bankCount = CountBankFragments()
         SaveCharacterCount(nil, bankCount)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffFragCounter:|r Bank scanned: " .. FormatNumber(bankCount) .. " fragments in bank.")
         UpdateDisplay()
 
     elseif event == "BANKFRAME_CLOSED" then
-        -- Don't re-scan; bank API returns 0 when closed
+        bankIsOpen = false
         UpdateDisplay()
+
+    elseif event == "PLAYERBANKSLOTS_CHANGED" then
+        if bankIsOpen then
+            local bankCount = CountBankFragments()
+            SaveCharacterCount(nil, bankCount)
+            UpdateDisplay()
+        end
     end
 end
+
+local bankIsOpen = false
 
 function FragCounter_OnUpdate()
     if bagUpdateDirty and addonLoaded then
         bagUpdateDirty = false
         local bagCount = CountBagFragments()
         SaveCharacterCount(bagCount, nil)
+        -- Also re-scan bank if it's open (moving items between bags and bank)
+        if bankIsOpen then
+            local bankCount = CountBankFragments()
+            SaveCharacterCount(nil, bankCount)
+        end
         UpdateDisplay()
     end
 end
