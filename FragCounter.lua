@@ -9,6 +9,7 @@ local REP_PER_TURNIN_HUMAN = 220
 
 -- Runtime goal value; persisted copy lives in FragCounterDB.goal
 local FRAGMENTS_TOTAL_GOAL = 36000
+local FARMING_ZONE = "Silithus"
 
 local sessionLooted = 0
 local sessionDeaths = 0
@@ -24,6 +25,10 @@ local merchantOpenMoney = nil -- GetMoney() when merchant opened
 -- Rolling window for rate calculation (last 15 minutes)
 local RATE_WINDOW = 900
 local lootTimestamps = {}
+
+local function IsInFarmingZone()
+    return GetRealZoneText() == FARMING_ZONE
+end
 
 local function GetDateKey()
     return date("%Y-%m-%d")
@@ -287,6 +292,14 @@ local function UpdateDisplay()
     local dayData = GetDailyEntry(today)
     local charTotal = GetAllCharacterTotal()
 
+    if IsInFarmingZone() then
+        FragCounterTitle:SetText("FragCounter")
+        FragCounterTitle:SetTextColor(1, 0.82, 0)
+    else
+        FragCounterTitle:SetText("FragCounter (paused)")
+        FragCounterTitle:SetTextColor(0.5, 0.5, 0.5)
+    end
+
     FragCounterSessionText:SetText("Session: +" .. FormatNumber(sessionLooted))
     FragCounterTodayText:SetText("Today: +" .. FormatNumber(dayData.looted))
 
@@ -360,8 +373,8 @@ local function OnFragmentsLooted(count)
     local dayData = GetDailyEntry(today)
     dayData.looted = dayData.looted + count
     local now = GetTime()
-    -- Accumulate active farming time: count gaps under 5 min as active
-    if dayData.lastLootTime then
+    -- Accumulate active farming time: count gaps under 5 min, only in Silithus
+    if dayData.lastLootTime and IsInFarmingZone() then
         local gap = now - dayData.lastLootTime
         if gap < 300 then
             dayData.activeTime = (dayData.activeTime or 0) + gap
@@ -708,6 +721,7 @@ function FragCounter_OnLoad()
     this:RegisterEvent("BANKFRAME_OPENED")
     this:RegisterEvent("BANKFRAME_CLOSED")
     this:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+    this:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 end
 
 function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
@@ -746,7 +760,9 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         UpdateDisplay()
 
     elseif event == "PLAYER_DEAD" then
-        OnPlayerDeath()
+        if IsInFarmingZone() then
+            OnPlayerDeath()
+        end
 
     elseif event == "CHAT_MSG_LOOT" then
         local count = ParseLootMessage(arg1)
@@ -755,8 +771,8 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         end
 
     elseif event == "CHAT_MSG_MONEY" then
-        -- Fires when you loot money: "You loot 1 Gold, 5 Silver, 23 Copper"
-        if arg1 and strfind(arg1, "You loot") then
+        -- Only track gold looted in the farming zone
+        if arg1 and strfind(arg1, "You loot") and IsInFarmingZone() then
             local copper = 0
             local _, _, g = strfind(arg1, "(%d+) Gold")
             local _, _, s = strfind(arg1, "(%d+) Silver")
@@ -775,7 +791,11 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         end
 
     elseif event == "MERCHANT_SHOW" then
-        merchantOpenMoney = GetMoney()
+        if IsInFarmingZone() then
+            merchantOpenMoney = GetMoney()
+        else
+            merchantOpenMoney = nil
+        end
 
     elseif event == "MERCHANT_CLOSED" then
         if merchantOpenMoney then
@@ -816,6 +836,9 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
             SaveCharacterCount(nil, bankCount)
             UpdateDisplay()
         end
+
+    elseif event == "ZONE_CHANGED_NEW_AREA" then
+        UpdateDisplay()
     end
 end
 
