@@ -24,6 +24,7 @@ local merchantOpenMoney = nil -- GetMoney() when merchant opened
 
 -- Rolling window for rate calculation (last 15 minutes)
 local RATE_WINDOW = 900
+local RELOAD_THRESHOLD = 60 -- max seconds between save and load to count as /reload
 local lootTimestamps = {}
 
 local function IsInFarmingZone()
@@ -274,14 +275,25 @@ local function ParseLootMessage(msg)
 end
 
 local function SaveSession()
+    local elapsed = sessionStartTime and (GetTime() - sessionStartTime) or 0
+    -- Convert timestamps to offsets from sessionStartTime (epoch-independent)
+    local relTimestamps = {}
+    if sessionStartTime then
+        for i = 1, getn(lootTimestamps) do
+            table.insert(relTimestamps, {
+                offset = lootTimestamps[i].time - sessionStartTime,
+                count = lootTimestamps[i].count,
+            })
+        end
+    end
     FragCounterDB.session = {
         looted = sessionLooted,
         deaths = sessionDeaths,
         gold = sessionGold,
         vendorGold = sessionVendorGold,
-        startTime = sessionStartTime,
-        timestamps = lootTimestamps,
-        savedTime = GetTime(),
+        elapsed = elapsed,
+        relTimestamps = relTimestamps,
+        savedWallTime = time(),
     }
 end
 
@@ -729,14 +741,26 @@ function FragCounter_OnEvent(event, arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
         InitDB()
         addonLoaded = true
 
-        -- Restore session if this is a /reload (GetTime continues counting)
-        if FragCounterDB.session and FragCounterDB.session.savedTime and GetTime() >= FragCounterDB.session.savedTime then
+        -- Restore session if this is a /reload (saved within last 60 seconds)
+        -- A fresh login after fully closing the client will have a larger gap
+        if FragCounterDB.session and FragCounterDB.session.savedWallTime and (time() - FragCounterDB.session.savedWallTime) < RELOAD_THRESHOLD then
             sessionLooted = FragCounterDB.session.looted or 0
             sessionDeaths = FragCounterDB.session.deaths or 0
             sessionGold = FragCounterDB.session.gold or 0
             sessionVendorGold = FragCounterDB.session.vendorGold or 0
-            sessionStartTime = FragCounterDB.session.startTime
-            lootTimestamps = FragCounterDB.session.timestamps or {}
+            local savedElapsed = FragCounterDB.session.elapsed or 0
+            sessionStartTime = savedElapsed > 0 and (GetTime() - savedElapsed) or nil
+            -- Convert relative offsets back to absolute GetTime() values
+            lootTimestamps = {}
+            if sessionStartTime then
+                local relTs = FragCounterDB.session.relTimestamps or {}
+                for i = 1, getn(relTs) do
+                    table.insert(lootTimestamps, {
+                        time = sessionStartTime + relTs[i].offset,
+                        count = relTs[i].count,
+                    })
+                end
+            end
         end
         FragCounterDB.session = nil
 
